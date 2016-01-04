@@ -14,8 +14,12 @@
 %%% die sich gemaess der Zuordnung bilden lassen
 %%%
 %%%%%%%%%%%%%%%%
+
 -spec extractLetters(list(non_neg_integer()))->list(list(char())).
-extractLetters(XYZ) -> toBeDefined.
+
+extractLetters([]) -> [[]];
+extractLetters([S|LS]) -> [Res++[C]||C<-assignChar(S),Res<-extractLetters(LS)].
+
 
 %%%%%%%%%%%%%%%%
 %%%
@@ -28,10 +32,25 @@ extractLetters(XYZ) -> toBeDefined.
 %%%%%%%%%%%%%%%%
 
 -spec splitter(char(),list({char(),non_neg_integer()}))->list({char(), non_neg_integer()}).
-splitter(X,Y) -> toBeDefined.
+%% splitter(X,Y) -> .
+
+%% searchT([],Key) -> [{Key,1}];
+%% searchT([{K,V}|LS],Key) when K==Key ->
+%% searchT(L,Key) -> lists:delete({K,V})++{Key,V+1};
+
+elementForKey([],_) -> false;
+elementForKey([{K,V}|LS],Key) when K == Key -> {Key,V};
+elementForKey([L|LS],Key) -> elementForKey(LS,Key);
+elementForKey(X,Y) -> X.
+
+splitter(X,[]) -> [{X,1}];
+splitter(X,L) -> case elementForKey(L,X) of
+									 false -> [{X,1}|L];
+									 {Key,V} -> [{Key,V+1}|lists:delete({Key,V},L)]
+								 end.
 
 -spec letterOccurences(list(char()))->occurrenceList().  
-letterOccurences(Word)-> SList= lists:sort(Word),
+letterOccurences(Word)-> SList= lists:sort(string:to_lower(Word)),		% nicht mehr original, da to_lower
 					OccList= lists:foldl(fun splitter/2,"",SList),
 					lists:reverse(OccList).
 
@@ -49,7 +68,9 @@ letterOccurences(Word)-> SList= lists:sort(Word),
 %%%%%%%%%%%%%%%%					
 
 -spec groupBy(fun((A) -> B), list(A)) -> dict:dict(B,A).
-groupBy(GBFun, List)-> toBeDefined.
+groupBy(GBFun, List)-> groupBy(GBFun,List,dict:new()).
+groupBy(GBFun,[],Acc) -> Acc;
+groupBy(GBFun, [L|LS],Acc) -> groupBy(GBFun,LS,dict:append(GBFun(L),L,Acc)).
 
 %%%%%%%%%%%%%%%%
 %%%
@@ -62,9 +83,11 @@ groupBy(GBFun, List)-> toBeDefined.
 %%% "Lin" als auch "nil" ergibt.
 %%%
 %%%%%%%%%%%%%%%%
-		
+
 -spec dictionaryOccurences()-> dict:dict() | {error,atom()}.
-dictionaryOccurences() -> toBeDefined.
+dictionaryOccurences() ->
+	{_,{L,_}} = loadDictionary(),
+	groupBy(fun letterOccurences/1,L).
 
 %%%%%%%%%%%%%%%%
 %%%
@@ -80,6 +103,9 @@ dictionaryOccurences() -> toBeDefined.
 %%% [{98,2}]]
 %%% Achtung: Die Anzahl der Buchstabenvorkommen (zweiter Wert des Tupels) muessen immer groesser 0 sein. 
 
+removeZero(L,{Letter,Occ}) when Occ >0 -> [{Letter,Occ}|L];
+removeZero(L,_) -> L.
+
 -spec combinations(occurrenceList())->list(occurrenceList()).
 combinations([]) -> [ [] ];
 combinations([{Letter,Occ}|XS]) -> [ removeZero(Y,{Letter,Q}) || Y<-combinations(XS), Q<-lists:seq(0,Occ)].
@@ -90,8 +116,14 @@ combinations([{Letter,Occ}|XS]) -> [ removeZero(Y,{Letter,Q}) || Y<-combinations
 %%% zweiten Abziehen. So ergibt bspw. der Aufruf: subtract([{$a,3},{$b,2},{$c,5}],[{$b,7},{$a,6},{$d,8},{$c,5}])
 %%% das Ergebnis [{$a,3},{$b,5},{$d,8}].
 
+minus(El,[]) -> El;
+minus({Letter1,Number1},[{Letter2,Number2}|LS]) when (Letter1==Letter2) -> {Letter1,Number1-Number2};
+minus(El, [L|LS]) -> minus(El,LS).
+
 -spec subtract(occurrenceList(), occurrenceList())-> occurrenceList().
-subtract(Occ1, Occ2)-> toBeDefined.
+subtract(Occ1, Occ2)-> subtract(Occ1,Occ2,[]).
+subtract(Occ1, [], Acc) -> Acc;
+subtract(Occ1,[L|LS],Acc) -> subtract(Occ1,LS,removeZero(Acc,minus(L,Occ1))).
 
 %%%%%%%%%%%%%%%%
 %%%	
@@ -121,8 +153,66 @@ subtract(Occ1, Occ2)-> toBeDefined.
 %%% ["nil","Rex","Zulu"],
 %%% ["Lin","Rex","Zulu"]]
 
+
+% Helper functions der folgenden Versuche 
+%% getWords(Combs,Dict) -> getWords(Combs,Dict,[]).
+%% getWords([],Dict,Acc) -> Acc;
+%% getWords([Word|List],Dict,Acc) ->
+%% 	case dict:find(Word,Dict) of
+%% 		error -> getWords(List,Dict,Acc);
+%% 		{ok,L}-> getWords(List,Dict,lists:append(L,Acc))
+%% 	end.
+
+% getWords(Occ,Dict) -> case dict:find(Occ,Dict) of
+% 												error -> [error];
+% 												{ok,L} -> L
+% 											end.
+
+% isKey(Occ,Dict) -> case dict:find(Occ,Dict) of
+% 										 error -> [error];
+% 										 _ -> Occ
+% 									 end.
+
+%% createWordLists([],Dict) -> [];
+%% createWordLists(Keys,Dict) -> [[Words]++createWordLists(Keys--[Key],Dict)||Key<-Keys,Words<-getWords(Key,Dict)].
+
 -spec getWordLists(occurrenceList(), dict:dict())->list(list(list(char()))).
-getWordLists(OccList, Dict) -> toBeDefined.	
+
+% Versuch 1
+% getWordLists(Occ,Dict) -> [{Word,C}||C<-combinations(Occ),isKey(C,Dict)/=[error],Word<-getWords(C,Dict)].
+
+% Versuch 2
+%% getWordLists(Occ,Dict) ->
+%% 	Keys = lists:filter(fun(X)->X/=[error] end,lists:map(fun(X)->isKey(X,Dict) end,combinations(Occ))),
+%% 	Res = createWordLists(Keys,Dict),
+%% 	pass.
+
+% Versuch 3
+%% getWordLists([],Dict) -> [];
+%% getWordLists(Occ,Dict) -> [[Words]++getWordLists(subtract(C,Occ),Dict)||C<-combinations(Occ),Words<-getWords(C,Dict),Words /= error].
+
+% Versuch 4
+%% getWordLists([],Combinations,Dict) -> [];
+%% getWordLists(Occ,[C|CS], Dict) ->
+%% 	C = combinations(Occ),
+%% 	case getWords(C,Dict) of
+%% 		error -> getWordLists(Occ,CS,Dict);
+%% 		L ->
+%% 	end.
+
+% Versuch 5
+%% getWordLists(OccList, Dict) ->
+%% 	Combinations = combinations(OccList),
+%% 	Res = lists:filter(fun(X) -> X /= error end,lists:map(fun(X)-> getWords(X,Dict) end ,Combinations)),
+%% 	pass.
+
+% Versuch 6
+%% getWordLists(OccList, Dict) ->
+%% 	Keys = dict:fetch_keys(Dict),
+%% 	C = combinations(OccList),
+%% 	Wat = dict:find([{105,1},{108,1},{110,1}],Dict),
+%% 	Words = getWords(C,Dict),
+%% 	pass.
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %%%
@@ -155,6 +245,7 @@ getSentences(NumberList)->
 %%% ergeben nicht unbedingt augenscheinlichen Sinn. 
 -spec frname()->list(char()).		
 frname()-> "words_eng.txt".
+% frname()-> "/Users/pascal/Developer/erlang/HTWFunctionalProgramming/Assignment2/src/words_eng.txt".
 
 -spec loadDictionary()->{ok, {list(list(char)),integer()}} | {error, atom()}.
 loadDictionary() ->    
@@ -192,4 +283,20 @@ assignNum(X) when X==$m; X==$n; X==$o; X==$M; X==$N; X==$O -> $6;
 assignNum(X) when X==$p; X==$q; X==$r; X==$s; X==$P; X==$Q; X==$R; X==$S -> $7;
 assignNum(X) when X==$t; X==$u; X==$v; X==$T; X==$U; X==$V -> $8;
 assignNum(X) when X==$w; X==$x; X==$y; X==$z; X==$W; X==$X; X==$Y; X==$Z -> $9.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%
+%%%%%   Helper Functions
+%%%%%
+%%%%%	Prepare Dictionary for Comparisons
+
+prepDict(Dict) -> L= dict:to_list(Dict),
+	SortedV= lists:map(fun({Key,Value})->{Key, lists:sort(Value)} end, L),
+	lists:keysort(1,SortedV).
+
+getWordsByOccurences(Word, DictOcc) ->
+	dict:find(bel2:letterOccurences(Word),DictOcc).
+
+%%%%%
+%%%%%
 
