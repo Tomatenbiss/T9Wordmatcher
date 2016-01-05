@@ -193,10 +193,10 @@ combinationsExceptEmpty(OccList) -> [A || A<-combinations(OccList), A /= []].
 search(error)->[];
 search({_,X})->X.
 
-%% getWords(Occ,Dict) -> case dict:find(Occ,Dict) of
-%% 												error -> [error];
-%% 												{ok,L} -> L
-%% 											end.
+getWords(Occ,Dict) -> case dict:find(Occ,Dict) of
+												error -> [error];
+												{ok,L} -> L
+											end.
 
 isKey(Occ,Dict) -> case dict:find(Occ,Dict) of
 										 error -> [error];
@@ -204,8 +204,8 @@ isKey(Occ,Dict) -> case dict:find(Occ,Dict) of
 									 end.
 
 
-getWords([X|[]],Dict,Acc)->search(dict:find(X,Dict))++Acc;
-getWords([X| Combs],Dict,Acc)-> getWords(Combs,Dict,search(dict:find(X,Dict))++Acc).
+%% getWords([X|[]],Dict,Acc)->search(dict:find(X,Dict))++Acc;
+%% getWords([X| Combs],Dict,Acc)-> getWords(Combs,Dict,search(dict:find(X,Dict))++Acc).
 
 
 
@@ -215,9 +215,9 @@ getWords([X| Combs],Dict,Acc)-> getWords(Combs,Dict,search(dict:find(X,Dict))++A
 
 
 -spec getWordLists(occurrenceList(), dict:dict())->list(list(list(char()))).
-getWordLists(OccList,Dict)->getWordLists(OccList,Dict,[]).
-getWordLists([],_,Result)->[Result];
-getWordLists(OccList,Dict,Result)->lists:concat(lists:filter(fun(Y)->Y/=[]end,[getWordLists(subtract(letterOccurences(string:to_lower(A)),OccList),Dict,Result++[A])||A<- getWords(combinationsExceptEmpty(OccList),Dict,[])])).
+%% getWordLists(OccList,Dict)->getWordLists(OccList,Dict,[]).
+%% getWordLists([],_,Result)->[Result];
+%% getWordLists(OccList,Dict,Result)->lists:concat(lists:filter(fun(Y)->Y/=[]end,[getWordLists(subtract(letterOccurences(string:to_lower(A)),OccList),Dict,Result++[A])||A<- getWords(combinationsExceptEmpty(OccList),Dict,[])])).
 
 
 
@@ -228,8 +228,9 @@ getWordLists(OccList,Dict,Result)->lists:concat(lists:filter(fun(Y)->Y/=[]end,[g
 
 %% getWordLists(Occ,Dict) -> [{Word,C}||C<-combinations(Occ),Word<-getWords(C,Dict),Word /= error].
 
-%% getWordLists([],Dict) -> [];
-%% getWordLists(Occ,Dict) -> [[Word]++List||C<-combinations(Occ),Word<-getWords(C,Dict),Word /= error,List<-getWordLists(subtract(C,Occ),Dict)].
+getWordLists(Occ,Dict) -> getWordLists(Occ,Dict,[]).
+getWordLists([],Dict,Acc) -> Acc;
+getWordLists(Occ,Dict,Acc) -> [getWordLists(subtract(C,Occ),Dict,Acc++[Word])||C<-combinations(Occ),Word<-getWords(C,Dict),Word /= error].
 
 %% getWordLists(Occ,Dict) ->
 %% 	Keys = lists:filter(fun(X)->X/=[error] end,lists:map(fun(X)->isKey(X,Dict) end,combinations(Occ))),
@@ -265,13 +266,12 @@ getWordLists(OccList,Dict,Result)->lists:concat(lists:filter(fun(Y)->Y/=[]end,[g
 %%% deren Buchstabenfolge sich durch die Zahlfolge repraesentieren laesst (richtige Reihenfolge).
 %%%
 
--spec filterWords(list(char()), list(list(char()))) -> list(list(char)).
 charsFromWordList(Stelle, X) -> lists:nth(Stelle, string:to_lower(X)).
 
+-spec filterWords(list(char()), list(list(char()))) -> list(list(char)).
+filterWords(NumList, WordList) -> filterWords(NumList, WordList, 1).
 filterWords([X|[]], WordList, Y) -> [ A || D<-assignChar(X), A<-WordList, D == charsFromWordList(Y, lists:concat(A))];
 filterWords([X|XS], WordList, Y) -> filterWords(XS, [ A || D<-assignChar(X), A<-WordList, D == charsFromWordList(Y, lists:concat(A))], Y + 1).
-
-filterWords(NumList, WordList) -> filterWords(NumList, WordList, 1).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%
