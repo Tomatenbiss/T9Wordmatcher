@@ -50,7 +50,7 @@ splitter(X,L) -> case elementForKey(L,X) of
 								 end.
 
 -spec letterOccurences(list(char()))->occurrenceList().  
-letterOccurences(Word)-> SList= lists:sort(string:to_lower(Word)),		% nicht mehr original, da to_lower
+letterOccurences(Word)-> SList= lists:sort(Word),		% nicht mehr original, da to_lower
 					OccList= lists:foldl(fun splitter/2,"",SList),
 					lists:reverse(OccList).
 
@@ -107,8 +107,8 @@ removeZero(L,{Letter,Occ}) when Occ >0 -> [{Letter,Occ}|L];
 removeZero(L,_) -> L.
 
 -spec combinations(occurrenceList())->list(occurrenceList()).
-combinations([]) -> [ [] ];
-combinations([{Letter,Occ}|XS]) -> [ removeZero(Y,{Letter,Q}) || Y<-combinations(XS), Q<-lists:seq(0,Occ)].
+combinations([])->[[]];
+combinations([{Letter,Occ}|XS])->[removeZero(Y,{Letter,Q})||Y<-combinations(XS),Q<-lists:seq(0,Occ)].
 
 %%%%%%%%%%%%%%%%
 %%%
@@ -132,29 +132,54 @@ subtract(Occ1,[L|LS],Acc) -> subtract(Occ1,LS,removeZero(Acc,minus(L,Occ1))).
 %%% So soll bspw. der Aufruf: 
 %%% getWordLists([{$e,1},{$i,1},{$l,2},{$n,1},{$r,1},{$u,2},{$x,1},{$z,1}], dictionaryOccurences()).
 %%% folgende Liste von Woertern ergeben:
-%%%[["Zulu","Rex","nil"],
-%%% ["Zulu","Rex","Lin"],
-%%% ["Rex","Zulu","nil"],
-%%% ["Rex","Zulu","Lin"],
-%%% ["Uzi","Rex","null"],
-%%% ["Rex","Uzi","null"],
-%%% ["Zulu","nil","Rex"],
-%%% ["Zulu","Lin","Rex"],
-%%% ["Uzi","null","Rex"],
-%%% ["null","Uzi","Rex"],
-%%% ["nil","Zulu","Rex"],
-%%% ["Lin","Zulu","Rex"],
-%%% ["rulez","Linux"],
-%%% ["Rex","null","Uzi"],
-%%% ["null","Rex","Uzi"],
-%%% ["Linux","rulez"],
-%%% ["Rex","nil","Zulu"],
-%%% ["Rex","Lin","Zulu"],
-%%% ["nil","Rex","Zulu"],
-%%% ["Lin","Rex","Zulu"]]
+%%%[["Zulu","Rex","nil"], 1
+%%% ["Zulu","Rex","Lin"],	2
+%%% ["Rex","Zulu","nil"],	1
+%%% ["Rex","Zulu","Lin"],	2
+%%% ["Uzi","Rex","null"],	3
+%%% ["Rex","Uzi","null"],	3
+%%% ["Zulu","nil","Rex"],	1
+%%% ["Zulu","Lin","Rex"],	2
+%%% ["Uzi","null","Rex"],	3
+%%% ["null","Uzi","Rex"],	3
+%%% ["nil","Zulu","Rex"],	1
+%%% ["Lin","Zulu","Rex"],	2
+%%% ["rulez","Linux"],		4
+%%% ["Rex","null","Uzi"],	3
+%%% ["null","Rex","Uzi"],	3
+%%% ["Linux","rulez"],		4
+%%% ["Rex","nil","Zulu"],	1
+%%% ["Rex","Lin","Zulu"],	2
+%%% ["nil","Rex","Zulu"],	1
+%%% ["Lin","Rex","Zulu"]]	2
 
 
-% Helper functions der folgenden Versuche 
+%%%[["Zulu","Rex","nil"], 1
+%%% ["Rex","Zulu","nil"],	1
+%%% ["Zulu","nil","Rex"],	1
+%%% ["nil","Zulu","Rex"],	1
+%%% ["Rex","nil","Zulu"],	1
+%%% ["nil","Rex","Zulu"],	1
+
+%%% ["Zulu","Rex","Lin"],	2
+%%% ["Lin","Rex","Zulu"]]	2
+%%% ["Rex","Zulu","Lin"],	2
+%%% ["Lin","Zulu","Rex"],	2
+%%% ["Zulu","Lin","Rex"],	2
+%%% ["Rex","Lin","Zulu"],	2
+
+%%% ["Uzi","Rex","null"],	3
+%%% ["Rex","Uzi","null"],	3
+%%% ["Uzi","null","Rex"],	3
+%%% ["null","Uzi","Rex"],	3
+%%% ["Rex","null","Uzi"],	3
+%%% ["null","Rex","Uzi"],	3
+
+%%% ["rulez","Linux"],		4
+%%% ["Linux","rulez"],		4
+
+
+
 %% getWords(Combs,Dict) -> getWords(Combs,Dict,[]).
 %% getWords([],Dict,Acc) -> Acc;
 %% getWords([Word|List],Dict,Acc) ->
@@ -163,35 +188,57 @@ subtract(Occ1,[L|LS],Acc) -> subtract(Occ1,LS,removeZero(Acc,minus(L,Occ1))).
 %% 		{ok,L}-> getWords(List,Dict,lists:append(L,Acc))
 %% 	end.
 
-% getWords(Occ,Dict) -> case dict:find(Occ,Dict) of
-% 												error -> [error];
-% 												{ok,L} -> L
-% 											end.
+combinationsExceptEmpty(OccList) -> [A || A<-combinations(OccList), A /= []].
 
-% isKey(Occ,Dict) -> case dict:find(Occ,Dict) of
-% 										 error -> [error];
-% 										 _ -> Occ
-% 									 end.
+search(error)->[];
+search({_,X})->X.
+
+%% getWords(Occ,Dict) -> case dict:find(Occ,Dict) of
+%% 												error -> [error];
+%% 												{ok,L} -> L
+%% 											end.
+
+isKey(Occ,Dict) -> case dict:find(Occ,Dict) of
+										 error -> [error];
+										 _ -> Occ
+									 end.
+
+
+getWords([X|[]],Dict,Acc)->search(dict:find(X,Dict))++Acc;
+getWords([X| Combs],Dict,Acc)-> getWords(Combs,Dict,search(dict:find(X,Dict))++Acc).
+
+
+
+
+
+
+
+
+-spec getWordLists(occurrenceList(), dict:dict())->list(list(list(char()))).
+getWordLists(OccList,Dict)->getWordLists(OccList,Dict,[]).
+getWordLists([],_,Result)->[Result];
+getWordLists(OccList,Dict,Result)->lists:concat(lists:filter(fun(Y)->Y/=[]end,[getWordLists(subtract(letterOccurences(string:to_lower(A)),OccList),Dict,Result++[A])||A<- getWords(combinationsExceptEmpty(OccList),Dict,[])])).
+
+
 
 %% createWordLists([],Dict) -> [];
 %% createWordLists(Keys,Dict) -> [[Words]++createWordLists(Keys--[Key],Dict)||Key<-Keys,Words<-getWords(Key,Dict)].
 
--spec getWordLists(occurrenceList(), dict:dict())->list(list(list(char()))).
+%% getWordLists(Occ,Dict) ->
 
-% Versuch 1
-% getWordLists(Occ,Dict) -> [{Word,C}||C<-combinations(Occ),isKey(C,Dict)/=[error],Word<-getWords(C,Dict)].
+%% getWordLists(Occ,Dict) -> [{Word,C}||C<-combinations(Occ),Word<-getWords(C,Dict),Word /= error].
 
-% Versuch 2
+%% getWordLists([],Dict) -> [];
+%% getWordLists(Occ,Dict) -> [[Word]++List||C<-combinations(Occ),Word<-getWords(C,Dict),Word /= error,List<-getWordLists(subtract(C,Occ),Dict)].
+
 %% getWordLists(Occ,Dict) ->
 %% 	Keys = lists:filter(fun(X)->X/=[error] end,lists:map(fun(X)->isKey(X,Dict) end,combinations(Occ))),
 %% 	Res = createWordLists(Keys,Dict),
 %% 	pass.
 
-% Versuch 3
 %% getWordLists([],Dict) -> [];
 %% getWordLists(Occ,Dict) -> [[Words]++getWordLists(subtract(C,Occ),Dict)||C<-combinations(Occ),Words<-getWords(C,Dict),Words /= error].
 
-% Versuch 4
 %% getWordLists([],Combinations,Dict) -> [];
 %% getWordLists(Occ,[C|CS], Dict) ->
 %% 	C = combinations(Occ),
@@ -200,13 +247,11 @@ subtract(Occ1,[L|LS],Acc) -> subtract(Occ1,LS,removeZero(Acc,minus(L,Occ1))).
 %% 		L ->
 %% 	end.
 
-% Versuch 5
 %% getWordLists(OccList, Dict) ->
 %% 	Combinations = combinations(OccList),
 %% 	Res = lists:filter(fun(X) -> X /= error end,lists:map(fun(X)-> getWords(X,Dict) end ,Combinations)),
 %% 	pass.
 
-% Versuch 6
 %% getWordLists(OccList, Dict) ->
 %% 	Keys = dict:fetch_keys(Dict),
 %% 	C = combinations(OccList),
@@ -221,7 +266,13 @@ subtract(Occ1,[L|LS],Acc) -> subtract(Occ1,LS,removeZero(Acc,minus(L,Occ1))).
 %%%
 
 -spec filterWords(list(char()), list(list(char()))) -> list(list(char)).
-filterWords(NumList, WordList)-> toBeDefined.
+charsFromWordList(Stelle, X) -> lists:nth(Stelle, string:to_lower(X)).
+
+filterWords([X|[]], WordList, Y) -> [ A || D<-assignChar(X), A<-WordList, D == charsFromWordList(Y, lists:concat(A))];
+filterWords([X|XS], WordList, Y) -> filterWords(XS, [ A || D<-assignChar(X), A<-WordList, D == charsFromWordList(Y, lists:concat(A))], Y + 1).
+
+filterWords(NumList, WordList) -> filterWords(NumList, WordList, 1).
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %%%
@@ -244,8 +295,8 @@ getSentences(NumberList)->
 %%% Achtung: Das Woerterbuch ist ueber die Linux-Manpages generiert - manche Woerter
 %%% ergeben nicht unbedingt augenscheinlichen Sinn. 
 -spec frname()->list(char()).		
-frname()-> "words_eng.txt".
-% frname()-> "/Users/pascal/Developer/erlang/HTWFunctionalProgramming/Assignment2/src/words_eng.txt".
+%% frname()-> "words_eng.txt".
+frname()-> "/Users/pascal/Developer/erlang/HTWFunctionalProgramming/Assignment2/src/words_eng.txt".
 
 -spec loadDictionary()->{ok, {list(list(char)),integer()}} | {error, atom()}.
 loadDictionary() ->    
@@ -300,3 +351,11 @@ getWordsByOccurences(Word, DictOcc) ->
 %%%%%
 %%%%%
 
+
+main()->
+	Occ = [{$e,1},{$i,1},{$l,2},{$n,1},{$r,1},{$u,2},{$x,1},{$z,1}],
+	Res = bel2:getWordLists(Occ, bel2:dictionaryOccurences()),
+%% 	Com = combinations(Occ),
+%% 	C1 = [{101,1}],
+%% 	Wat = subtract(C1,Occ),
+	pass.
